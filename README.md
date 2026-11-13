@@ -245,6 +245,12 @@ logs with `journalctl --user -u vllm-lfm3`. Point
 [OpenCode](https://opencode.ai) (or any OpenAI client) at
 `http://127.0.0.1:8110/v1` with model id `lfm3-1.7b-uncensored`.
 
+When configuring the model in an agent client, set the **output token limit
+high** (e.g. 32000). This checkpoint's thinking is very verbose — a
+red-black-tree implementation consumed 27k tokens (107k characters of
+reasoning) — so a low cap such as 8192 triggers repeated truncation and
+client-side "output token limit" errors.
+
 ## Alternatives
 
 - **llama.cpp (GGUF)** — the DSpark card ships a drafter GGUF for
