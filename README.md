@@ -85,6 +85,9 @@ curl -s 127.0.0.1:8110/metrics | grep spec_decode_num
 | `TARGET` | `OpenIntelligenceNet/LFM3-1.7B-Uncensored` | target model repo id or local dir |
 | `DRAFT` | `rasyosef/LFM3-1.7B-DSpark` | DSpark draft repo id or local dir |
 | `PY` | `./venv/bin/python` | python with vLLM installed |
+| `TOOL_PARSER` | `qwen3_coder` | tool-call parser (empty disables tool calls) |
+| `REASONING_PARSER` | `qwen3` | reasoning parser for `thinking` blocks |
+| `THINKING` | `on` | `off` disables the template's thinking mode by default |
 | `$1` | `dspark` | `baseline` to serve without the drafter |
 
 Examples:
@@ -97,6 +100,52 @@ TARGET=LiquidAI/LFM3-1.7B ./serve.sh         # the base instruct model
 
 There is no API key by default — if you bind to a shared network, add
 `--api-key <secret>` to the `vllm serve` invocation in `serve.sh`.
+
+## Tool calling
+
+LFM3 renders tool calls in the Qwen3-Coder XML shape:
+
+```
+<tool_call>
+<function=name>
+<parameter=key>value</parameter>
+</function>
+</tool_call>
+```
+
+`serve.sh` therefore starts vLLM with Liquid's documented flags for LFM3:
+
+```sh
+--enable-auto-tool-choice --tool-call-parser qwen3_coder \
+--reasoning-parser qwen3
+```
+
+This is required for clients that send `tool_choice: "auto"` (OpenCode and
+most agent harnesses do). Other parsers do not match this format: `glm45`
+parses the entire `<function=...>` block as the function name and returns
+empty arguments, and `lfm2` expects `<|tool_call_start|>` markers that LFM3
+does not emit.
+
+Verified request (returns `finish_reason: "tool_calls"` with
+`{"command": "ls -la"}`):
+
+```sh
+curl http://127.0.0.1:8110/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"lfm3-1.7b-uncensored",
+       "messages":[{"role":"user","content":"List the files here."}],
+       "tool_choice":"auto",
+       "tools":[{"type":"function","function":{
+         "name":"bash","description":"Run a shell command",
+         "parameters":{"type":"object",
+           "properties":{"command":{"type":"string"}},
+           "required":["command"]}}}]}'
+```
+
+The template enables thinking by default; the `qwen3` reasoning parser keeps
+that in `reasoning` and leaves `content` clean. Setting `THINKING=off` makes
+answers direct, but this checkpoint then tends to leak reasoning text into
+`content`, so `on` is the better default.
 
 ## Benchmarks
 
