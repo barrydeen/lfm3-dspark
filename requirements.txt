@@ -1,0 +1,10 @@
+# vLLM must come from PR #66323 (adds DSpark/EAGLE-3 aux hidden state
+# support for Lfm3ForCausalLM). VLLM_USE_PRECOMPILED=1 reuses the prebuilt
+# wheel's CUDA kernels, so this installs without a CUDA toolkit / nvcc.
+#
+#   VLLM_USE_PRECOMPILED=1 pip install -r requirements.txt
+#
+# If PR #66323 has been merged upstream by the time you install, a plain
+# `pip install vllm` is enough.
+vllm @ git+https://github.com/vllm-project/vllm.git@refs/pull/66323/head
+huggingface_hub[cli]>=0.34
