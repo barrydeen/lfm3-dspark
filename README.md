@@ -158,6 +158,44 @@ published behavior.
 - **Slow model download** — set `HF_ENDPOINT` for mirrors, or pre-download
   with `hf download <repo> --local-dir models/<name>`.
 
+## Run as an always-on service (systemd)
+
+On a machine where the model should just be up (e.g. a laptop that doubles
+as your inference box), run it as a systemd user service:
+
+```sh
+cat > ~/.config/systemd/user/vllm-lfm3.service <<EOF
+[Unit]
+Description=LFM3-1.7B-Uncensored on vLLM with DSpark (port 8110)
+Documentation=https://github.com/barrydeen/lfm3-dspark
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=__REPO_DIR__
+ExecStart=__REPO_DIR__/serve.sh
+Environment=PORT=8110 HOST=0.0.0.0
+# First load is weight check + CUDA graph capture (~100 s); the systemd
+# default of 90 s would kill a healthy startup.
+TimeoutStartSec=300
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+# sed the two __REPO_DIR__ placeholders to this clone's path, then:
+systemctl --user daemon-reload
+systemctl --user enable --now vllm-lfm3
+sudo loginctl enable-linger $(whoami)   # one-time: keep it running across
+                                         # reboots even without a login
+```
+
+Manage it with `systemctl --user status|restart|stop vllm-lfm3` and read
+logs with `journalctl --user -u vllm-lfm3`. Point
+[OpenCode](https://opencode.ai) (or any OpenAI client) at
+`http://127.0.0.1:8110/v1` with model id `lfm3-1.7b-uncensored`.
+
 ## Alternatives
 
 - **llama.cpp (GGUF)** — the DSpark card ships a drafter GGUF for
